@@ -1,10 +1,8 @@
 [build]
 builder = "dockerfile"
-dockerfile = "backend/Dockerfile"
-context = "backend"
+dockerfilePath = "backend/Dockerfile"
 
 [deploy]
-startCommand = "./entrypoint.sh"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
