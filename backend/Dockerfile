@@ -13,7 +13,7 @@ RUN apt-get update && \
         libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 # Install Python packages into a prefix we can copy cleanly
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
@@ -33,15 +33,15 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 
 # Copy application code
-COPY app/ ./app/
+COPY backend/app/ ./app/
 
 # Copy Alembic config and migrations
-COPY alembic.ini .
-COPY alembic/ ./alembic/
+COPY backend/alembic.ini .
+COPY backend/alembic/ ./alembic/
 
 # Copy migration runner and entrypoint
-COPY run_migrations.py .
-COPY entrypoint.sh .
+COPY backend/run_migrations.py .
+COPY backend/entrypoint.sh .
 
 # Make entrypoint executable
 RUN chmod +x entrypoint.sh
