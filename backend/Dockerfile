@@ -61,7 +61,7 @@ EXPOSE 8000
 
 # Healthcheck: hit the built-in /api/health endpoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
+    CMD-SHELL python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.getenv('PORT', '8000') + '/api/health')" || exit 1
 
 # Entry point runs migrations then starts server
 ENTRYPOINT ["./entrypoint.sh"]
