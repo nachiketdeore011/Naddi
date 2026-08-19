@@ -1,0 +1,15 @@
+[build]
+builder = "dockerfile"
+dockerfile = "backend/Dockerfile"
+context = "backend"
+
+[deploy]
+startCommand = "./entrypoint.sh"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[deploy.environment]
+PYTHONUNBUFFERED = "1"
+PYTHONDONTWRITEBYTECODE = "1"

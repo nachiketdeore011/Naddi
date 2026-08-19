@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes import patients, pulse, websocket, simulator, devices
 from app.database.connection import engine, Base
 from app.services.batch_writer import batch_writer
+from app.config import settings
 
 
 @asynccontextmanager
@@ -31,10 +32,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS for frontend
+# CORS for frontend - reads from settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=settings.cors_origins.split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
