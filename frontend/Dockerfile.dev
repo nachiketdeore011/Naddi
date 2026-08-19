@@ -1,0 +1,22 @@
+# ============================================================
+# Frontend Development Server (Vite + HMR)
+# ============================================================
+# Used by docker-compose.yml in dev mode.
+# Mounts source code for live reload.
+# ============================================================
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies (cached layer)
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Source code is mounted via volume in docker-compose.yml
+# so changes trigger Vite HMR instantly
+
+EXPOSE 3000
+
+# Run Vite dev server — host 0.0.0.0 so nginx can reach it
+CMD ["npx", "vite", "--host", "0.0.0.0", "--port", "3000"]

@@ -1,0 +1,138 @@
+version: "3.9"
+
+# ============================================================
+# Development Stack
+# ============================================================
+# Entry point: http://localhost (nginx on port 80)
+#
+# Traffic flow:
+#   localhost:80 → nginx
+#     /api/*  → backend:8000 (FastAPI)
+#     /ws/*   → backend:8000 (WebSocket)
+#     /*      → frontend:3000 (Vite dev server + HMR)
+# ============================================================
+
+services:
+  # ── PostgreSQL ──
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: nadi
+      POSTGRES_PASSWORD: nadi
+      POSTGRES_DB: nadi_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nadi -d nadi_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── ML Inference Service ──
+  ml:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./ml/models:/app/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Database Migrations ──
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    command: ["python", "run_migrations.py"]
+    environment:
+      - DATABASE_URL=postgresql://nadi:nadi@db:5432/nadi_db
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    profiles:
+      - tools                  # only run with: docker compose --profile tools run migrate
+
+  # ── FastAPI Backend ──
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://nadi:nadi@db:5432/nadi_db
+      - ML_SERVICE_URL=http://ml:8001
+    depends_on:
+      db:
+        condition: service_healthy
+      ml:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── React Frontend (Vite dev server) ──
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js
+    environment:
+      - WATCHPACK_POLLING=true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Nginx Reverse Proxy (entry point) ──
+  # Access the app at http://localhost
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  pgdata:

@@ -1,0 +1,46 @@
+# ============================================================
+# Traefik Dynamic Configuration
+# ============================================================
+# Middleware applied to all routes: security headers,
+# compression, and rate limiting.
+# ============================================================
+
+http:
+  middlewares:
+    # ── Security Headers ──
+    secure-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        frameDeny: true
+        customResponseHeaders:
+          X-Powered-By: ""
+
+    # ── Rate Limiting ──
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1s
+
+    # ── Compression ──
+    compress:
+      compress: {}
+
+    # ── Redirect www to non-www ──
+    redirect-www:
+      redirectRegex:
+        regex: '^https://www\.(.*)'
+        replacement: 'https://${1}'
+        permanent: true
+
+    # ── Strip API prefix (optional, for clean URLs) ──
+    strip-api:
+      stripPrefix:
+        prefixes:
+          - "/api"

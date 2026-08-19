@@ -1,0 +1,46 @@
+
+> nadi-dashboard@0.1.0 dev
+> vite
+
+Port 3000 is in use, trying another one...
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m254[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m3001[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+Error: [31m  Failed to scan for dependencies from entries:
+  C:/Users/nachiket/OneDrive/Desktop/Nadii/frontend/index.html
+
+  [39m[31mX [41;31m[[41;97mERROR[41;31m][0m [1mUnexpected end of file before a closing "div" tag[0m
+
+    src/pages/Devices.tsx:201:0:
+[37m      201 │ [32m[37m
+          │ [32m^[37m
+          ╵ [32m</div>[0m
+
+  The opening "div" tag is here:
+
+    src/pages/Devices.tsx:188:25:
+[37m      188 │                         <[32mdiv[37m className="flex items-center gap-2">
+          ╵                          [32m~~~[0m
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mUnexpected end of file[0m
+
+    src/pages/Patients.tsx:78:0:
+[37m      78 │ [32m[37m
+         ╵ [32m^[0m
+
+
+    at failureErrorWithLog (C:\Users\nachiket\OneDrive\Desktop\Nadii\frontend\node_modules\esbuild\lib\main.js:1472:15)
+    at C:\Users\nachiket\OneDrive\Desktop\Nadii\frontend\node_modules\esbuild\lib\main.js:945:25
+    at runOnEndCallbacks (C:\Users\nachiket\OneDrive\Desktop\Nadii\frontend\node_modules\esbuild\lib\main.js:1315:45)
+    at buildResponseToResult (C:\Users\nachiket\OneDrive\Desktop\Nadii\frontend\node_modules\esbuild\lib\main.js:943:7)
+    at C:\Users\nachiket\OneDrive\Desktop\Nadii\frontend\node_modules\esbuild\lib\main.js:955:9
+    at new Promise (<anonymous>)
+    at requestCallbacks.on-end (C:\Users\nachiket\OneDrive\Desktop\Nadii\frontend\node_modules\esbuild\lib\main.js:954:54)
+    at handleRequest (C:\Users\nachiket\OneDrive\Desktop\Nadii\frontend\node_modules\esbuild\lib\main.js:647:17)
+    at handleIncomingPacket (C:\Users\nachiket\OneDrive\Desktop\Nadii\frontend\node_modules\esbuild\lib\main.js:672:7)
+    at Socket.readFromStdout (C:\Users\nachiket\OneDrive\Desktop\Nadii\frontend\node_modules\esbuild\lib\main.js:600:7)
+
+C:\Users\nachiket\OneDrive\Desktop\Nadii\frontend>

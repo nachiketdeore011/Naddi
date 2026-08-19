@@ -1,0 +1,52 @@
+# ============================================================
+# Traefik Static Configuration
+# ============================================================
+# This file configures Traefik's entrypoints, certificates,
+# API dashboard, and Docker provider.
+# ============================================================
+
+# ── API / Dashboard ──
+api:
+  dashboard: true
+  insecure: false            # access via router, not :8080
+
+# ── Entrypoints ──
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+
+# ── Let's Encrypt Certificate Resolver ──
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "${ACME_EMAIL}"
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: web
+
+# ── Docker Provider ──
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false   # only route services with traefik.enable=true
+    network: traefik-public
+
+# ── Logging ──
+log:
+  level: INFO
+
+accessLog:
+  filePath: /var/log/traefik/access.log
+  bufferingSize: 100

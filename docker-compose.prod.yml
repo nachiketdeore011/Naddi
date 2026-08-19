@@ -1,0 +1,180 @@
+version: "3.9"
+
+# ============================================================
+# Production Overrides with Traefik + Auto-TLS
+# ============================================================
+# Usage:
+#   cp .env.example .env          # fill in your domain + email
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This adds:
+#   - Traefik reverse proxy on ports 80/443
+#   - Automatic HTTPS via Let's Encrypt (HTTP challenge)
+#   - Security headers, rate limiting, compression
+#   - HTTP → HTTPS redirect
+#
+# Prerequisites:
+#   - A domain name pointing to your server's public IP
+#   - Ports 80 and 443 open on the firewall
+#   - ACME_EMAIL set in .env (for Let's Encrypt notifications)
+# ============================================================
+
+services:
+  # ────────────────────────────────────────────────────────────
+  # Traefik Reverse Proxy
+  # ────────────────────────────────────────────────────────────
+  traefik:
+    image: traefik:v3.2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - traefik-certs:/letsencrypt
+    environment:
+      - ACME_EMAIL=${ACME_EMAIL:?Set ACME_EMAIL in .env}
+    networks:
+      - traefik-public
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      # ── Enable Traefik for this container ──
+      - "traefik.enable=true"
+
+      # ── Traefik dashboard at https://traefik.${DOMAIN}/dashboard/ ──
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.middlewares=auth@file"
+
+      # ── Basic auth for dashboard (admin:changeme — change in production!) ──
+      - "traefik.http.middlewares.auth.basicauth.users=${DASHBOARD_AUTH:-admin:$$apr1$$xyz$$placeholder}"
+
+  # ────────────────────────────────────────────────────────────
+  # Backend — production build, no volume mount
+  # ────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    volumes: []
+    expose:
+      - "8000"                     # internal only, no host port
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+    environment:
+      - ENVIRONMENT=production
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+
+      # ── API router: https://<domain>/api/* ──
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      - "traefik.http.services.backend.loadbalancer.healthcheck.path=/api/health"
+      - "traefik.http.services.backend.loadbalancer.healthcheck.interval=15s"
+
+      # ── WebSocket router: https://<domain>/ws/* ──
+      - "traefik.http.routers.backend-ws.rule=Host(`${DOMAIN}`) && PathPrefix(`/ws`)"
+      - "traefik.http.routers.backend-ws.entrypoints=websecure"
+      - "traefik.http.routers.backend-ws.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-ws.service=backend"
+      - "traefik.http.routers.backend-ws.middlewares=secure-headers@file,rate-limit@file"
+
+      # ── Middleware chain for API ──
+      - "traefik.http.routers.backend.middlewares=secure-headers@file,rate-limit@file,compress@file"
+
+  # ────────────────────────────────────────────────────────────
+  # Frontend — production build (nginx serves static files)
+  # ────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    volumes: []
+    expose:
+      - "3000"                     # internal only, no host port
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+
+      # ── Frontend router: https://<domain>/* ──
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      - "traefik.http.services.frontend.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.frontend.loadbalancer.healthcheck.interval=15s"
+
+      # ── Middleware chain for frontend ──
+      - "traefik.http.routers.frontend.middlewares=secure-headers@file,compress@file,redirect-www@file"
+
+  # ────────────────────────────────────────────────────────────
+  # ML Service — internal only, no Traefik labels
+  # ────────────────────────────────────────────────────────────
+  ml:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+      target: production
+    volumes: []
+    expose:
+      - "8001"                     # internal only
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "2.0"
+        reservations:
+          memory: 512M
+
+  # ────────────────────────────────────────────────────────────
+  # Database — internal only, resource limits
+  # ────────────────────────────────────────────────────────────
+  db:
+    expose:
+      - "5432"                     # internal only
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+  # ────────────────────────────────────────────────────────────
+  # Nginx — disabled in production (Traefik replaces it)
+  # ────────────────────────────────────────────────────────────
+  nginx:
+    profiles:
+      - dev
+
+volumes:
+  pgdata:
+  traefik-certs:                   # persistent Let's Encrypt certificates
+
+networks:
+  traefik-public:
+    driver: bridge
